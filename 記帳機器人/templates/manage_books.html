@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>帳本與明細管理</title>
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <style>
+    body { background-color: #f8fafc; }
+    .book-item.active { background-color: #4ade80 !important; color: #fff; }
+    .book-item:hover { cursor: pointer; }
+    .table td, .table th { vertical-align: middle; }
+    .btn-icon { width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center; padding: 0; }
+  </style>
+</head>
+<body>
+  <script>
+    const USER_ID = "{{ user_id }}";
+  </script>
+
+  <div class="container py-4">
+    <h2 class="text-center mb-4">📚 帳本與明細管理</h2>
+    <div class="row g-4">
+      <!-- 帳本清單 -->
+      <div class="col-lg-3">
+        <div class="card shadow-sm">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>我的帳本</span>
+            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addBookModal">＋ 新增</button>
+          </div>
+          <ul class="list-group list-group-flush" id="bookList">
+            <!-- 動態插入帳本 -->
+          </ul>
+          <div class="card-footer">
+            <label class="form-label mb-1">🤖 機器人記帳的帳本：</label>
+            <div class="input-group">
+                <select id="activeBookSelect" class="form-select"></select>
+                <button class="btn btn-outline-primary" onclick="saveActiveBook()">儲存</button>
+            </div>
+            </div>
+        </div>
+      </div>
+
+      <!-- 明細區域 -->
+      <div class="col-lg-9">
+        <div class="card shadow-sm">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span id="entriesTitle">明細</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>類型</th>
+                  <th>描述</th>
+                  <th>金額</th>
+                  <th>時間</th>
+                  <th class="text-end">操作</th>
+                </tr>
+              </thead>
+              <tbody id="entryTableBody">
+                <!-- 動態插入明細 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✨ 新增帳本 Modal -->
+  <div class="modal fade" id="addBookModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" onsubmit="createBook(event)">
+        <div class="modal-header">
+          <h5 class="modal-title">新增帳本</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="bookName" class="form-label">帳本名稱</label>
+            <input type="text" id="bookName" class="form-control" required />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-success">新增</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ✨ 編輯明細 Modal -->
+  <div class="modal fade" id="editEntryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" onsubmit="updateEntry(event)">
+        <div class="modal-header">
+          <h5 class="modal-title">編輯明細</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editEntryId" />
+          <div class="mb-3">
+            <label class="form-label">名稱 / 描述</label>
+            <input type="text" id="editDescription" class="form-control" required />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">金額 (NT$)</label>
+            <input type="number" id="editAmount" class="form-control" min="0" step="1" required />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">類型</label>
+            <select id="editType" class="form-select" required>
+              <option value="收入">收入</option>
+              <option value="支出">支出</option>
+            </select>
+          </div>
+        </div>
+       <div class="modal-footer">
+            <button type="button" class="btn btn-danger me-auto" onclick="deleteEntry()">刪除</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-primary">儲存變更</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+ <script>
+    const API = {
+      books: `/api/books/${USER_ID}`,
+      book: (id) => `/api/books/${id}`,
+      entries: (id) => `/api/books/${id}/entries`,
+      entry: (id) => `/api/entries/${id}`
+    };
+
+    let books = [];
+    let currentBook = null;
+    let activeBookId = null;
+
+    async function fetchBooks() {
+      const res = await fetch(API.books);
+      books = await res.json();
+      renderBookList();
+      fillActiveBookSelect();
+      if (!currentBook && books.length) {
+        const res = await fetch(`/api/default_book/${USER_ID}`);
+        const data = await res.json();
+        const defaultId = data.default_book_id;
+
+        const target = books.find(b => b.id == defaultId) || books[0];
+        selectBook(target.id);
+        document.getElementById("activeBookSelect").value = target.id;
+        }
+
+    }
+
+    function renderBookList() {
+      const ul = document.getElementById("bookList");
+      ul.innerHTML = "";
+      books.forEach((b) => {
+        const li = document.createElement("li");
+        li.className = `list-group-item d-flex justify-content-between align-items-center book-item ${currentBook && b.id === currentBook.id ? "active" : ""}`;
+        li.onclick = () => selectBook(b.id);
+        li.innerHTML = `
+          <span>${b.name}</span>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-outline-light btn-icon" title="刪除" onclick="event.stopPropagation(); deleteBook(${b.id}, '${b.name}')" ${b.name === '預設帳本' ? "disabled" : ""}>🗑️</button>
+          </div>`;
+        ul.appendChild(li);
+      });
+    }
+
+    function deleteEntry() {
+        const id = document.getElementById("editEntryId").value;
+        if (!confirm("確定要刪除這筆明細嗎？")) return;
+        fetch(`/api/entries/${id}`, { method: "DELETE" }).then((res) => {
+            if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById("editEntryModal")).hide();
+            fetchEntries();
+            } else alert("刪除失敗");
+        });
+    }
+    function fillActiveBookSelect() {
+      const sel = document.getElementById("activeBookSelect");
+      sel.innerHTML = books.map((b) => `<option value="${b.id}">${b.name}</option>`).join("");
+      if (activeBookId) sel.value = activeBookId;
+    }
+
+    function saveActiveBook() {
+        const selectedId = document.getElementById("activeBookSelect").value;
+        activeBookId = selectedId;
+        fetch(`/api/active_book`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                book_id: selectedId,
+                line_user_id: USER_ID   // ✅ 傳給後端辨識使用者
+            })
+        }).then((res) => {
+            if (!res.ok) alert("儲存失敗");
+            else alert("✅ 已設定為機器人記帳帳本！");
+        });
+    }
+
+
+    async function createBook(e) {
+      e.preventDefault();
+      const name = document.getElementById("bookName").value.trim();
+      if (!name) return;
+      const res = await fetch(`/api/books?user_id=${USER_ID}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+      if (res.ok) {
+        bootstrap.Modal.getInstance(document.getElementById("addBookModal")).hide();
+        await fetchBooks();
+      } else alert("新增失敗");
+    }
+
+    async function deleteBook(id, name) {
+      if (name === "預設帳本") return;
+      if (!confirm(`確定要刪除帳本「${name}」嗎？\n此操作無法復原！`)) return;
+      const res = await fetch(API.book(id), { method: "DELETE" });
+      if (res.ok) {
+        if (currentBook && currentBook.id === id) currentBook = null;
+        await fetchBooks();
+      } else alert("刪除失敗");
+    }
+
+    async function setActiveBook(bookId) {
+      activeBookId = bookId;
+      await fetch(`/api/active_book`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ book_id: bookId }) });
+    }
+
+    function selectBook(id) {
+      currentBook = books.find((b) => b.id === id);
+      document.querySelectorAll(".book-item").forEach((li) => li.classList.remove("active"));
+      const items = document.querySelectorAll(".book-item");
+      items[books.findIndex((b) => b.id === id)].classList.add("active");
+      document.getElementById("entriesTitle").innerText = `明細 – ${currentBook.name}`;
+      fetchEntries();
+    }
+
+    async function fetchEntries() {
+      if (!currentBook) return;
+      const res = await fetch(API.entries(currentBook.id));
+      const entries = await res.json();
+      renderEntries(entries);
+    }
+
+    function renderEntries(entries) {
+    const tbody = document.getElementById("entryTableBody");
+    tbody.innerHTML = "";
+    entries.forEach((e) => {
+        const d = new Date(e.created_at.replace(" ", "T"));
+        const formatted = d.toLocaleString('zh-TW');
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+        <td class="${e.entry_type === '收入' ? 'text-success' : 'text-danger'}">${e.entry_type}</td>
+        <td>${e.description}</td>
+        <td>NT$${e.amount}</td>
+        <td>${formatted}</td>
+        <td class="text-end">
+            <button class="btn btn-outline-primary btn-sm" onclick="openEditEntry(${e.id}, '${e.description.replace(/'/g, "\'")}', ${e.amount}, '${e.entry_type}')">編輯</button>
+        </td>`;
+        tbody.appendChild(tr);
+    });
+    }
+
+    function openEditEntry(id, desc, amt, type) {
+      document.getElementById("editEntryId").value = id;
+      document.getElementById("editDescription").value = desc;
+      document.getElementById("editAmount").value = amt;
+      document.getElementById("editType").value = type;
+      new bootstrap.Modal(document.getElementById("editEntryModal")).show();
+    }
+
+    async function updateEntry(e) {
+      e.preventDefault();
+      const id = document.getElementById("editEntryId").value;
+      const payload = {
+        description: document.getElementById("editDescription").value.trim(),
+        amount: Number(document.getElementById("editAmount").value),
+        entry_type: document.getElementById("editType").value
+      };
+      const res = await fetch(API.entry(id), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (res.ok) {
+        bootstrap.Modal.getInstance(document.getElementById("editEntryModal")).hide();
+        fetchEntries();
+      } else alert("更新失敗");
+    }
+
+    function deleteEntry() {
+        const id = document.getElementById("editEntryId").value;
+        if (!confirm("確定要刪除這筆明細嗎？")) return;
+        fetch(`/api/entries/${id}`, { method: "DELETE" }).then((res) => {
+            if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById("editEntryModal")).hide();
+            fetchEntries();
+            } else alert("刪除失敗");
+        });
+    }
+    fetchBooks();
+    
+    window.addEventListener("DOMContentLoaded", async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const entryId = urlParams.get("entry_id");
+      if (entryId) {
+        const res = await fetch(`/api/entries/${entryId}`);
+        if (res.ok) {
+          const entry = await res.json();
+          openEditEntry(entry.id, entry.description, entry.amount, entry.entry_type);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>帳本總覽</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .card { transition: transform 0.2s; }
+        .card:hover { transform: scale(1.03); }
+        .toggle-btn-group .btn {
+            font-size: 1.25rem;
+            padding: 0.75rem 2rem;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="container py-4">
+    <h2 class="text-center mb-4">📒 帳本總覽</h2>
+
+    <!-- 📅 選擇帳本與月份 -->
+    <div class="text-center mb-3">
+        <form method="get" id="filterForm" class="d-inline-flex align-items-center gap-2">
+            <label for="bookSelect">選擇帳本：</label>
+            <select id="bookSelect" name="book" onchange="document.getElementById('filterForm').submit()">
+              {% for book in books %}
+                <option value="{{ book.id }}" {% if book.id == selected_book %}selected{% endif %}>{{ book.name }}</option>
+              {% endfor %}
+            </select>
+            <label for="monthSelect" class="ms-3">選擇月份：</label>
+            <select id="monthSelect" name="month" onchange="document.getElementById('filterForm').submit()">
+                <option value="">全部</option>
+                {% for i in range(12) %}
+                    {% set month_value = (now.replace(day=1) - timedelta(days=30*i)).strftime('%Y-%m') %}
+                    <option value="{{ month_value }}" {% if request.args.get('month') == month_value %}selected{% endif %}>{{ month_value }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    <!-- 🔘 切換按鈕 -->
+    <div class="d-flex justify-content-center mb-3">
+      <div class="btn-group rounded-pill bg-light shadow-sm toggle-btn-group">
+        <button class="btn btn-success rounded-start-pill" id="btnPie" onclick="toggleChart('pie')">一般</button>
+        <button class="btn btn-outline-secondary rounded-end-pill" id="btnLine" onclick="toggleChart('line')">水上or水下</button>
+      </div>
+    </div>
+
+    <!-- 📊 圖表容器 -->
+    <div class="row justify-content-center mb-4">
+      <div class="col-md-8 text-center">
+        <canvas id="chartCanvas" width="400" height="300"></canvas>
+        <div id="balanceStatus" class="mt-3 fs-5"></div>
+      </div>
+    </div>
+
+    <!-- 💳 摘要卡片 -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-primary">收入</h6>
+                    <p class="card-text h5">${{ summary.get('收入', 0) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-danger">支出</h6>
+                    <p class="card-text h5">${{ summary.get('支出', 0) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success text-center">
+                <div class="card-body">
+                    <h6 class="card-title text-success">結餘</h6>
+                    <p class="card-text h5">${{ balance }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📋 明細列表 -->
+    <h5 class="mt-4">📋 明細列表</h5>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>類型</th>
+                    <th>描述</th>
+                    <th>金額</th>
+                    <th>時間</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                <tr>
+                    <td>{{ entry.entry_type }}</td>
+                    <td>{{ entry.description }}</td>
+                    <td class="{{ 'text-success' if entry.entry_type == '收入' else 'text-danger' }}">
+                        NT${{ entry.amount }}
+                    </td>
+                    <td>{{ entry.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+  const ctx = document.getElementById('chartCanvas').getContext('2d');
+  let currentChart;
+  const balance = {{ balance }};
+  const entries = {{ entries|tojson }};
+
+  const summary = {
+    '收入': {{ summary.get('收入', 0) }},
+    '支出': {{ summary.get('支出', 0) }}
+  };
+
+  function drawPieChart() {
+    if (currentChart) currentChart.destroy();
+    currentChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['支出', '收入'],
+        datasets: [{
+          data: [summary['支出'], summary['收入']],
+          backgroundColor: ['#f87171', '#60a5fa'],
+          borderColor: ['#ef4444', '#3b82f6'],
+          borderWidth: 2,
+          borderRadius: 10,
+          hoverOffset: 20
+        }]
+      },
+      options: {
+        cutout: '70%',
+        plugins: { legend: { position: 'bottom' } }
+      },
+      plugins: [{
+        id: 'centerText',
+        beforeDraw(chart) {
+          const { width, height, ctx } = chart;
+          ctx.restore();
+          ctx.font = 'bold 20px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#333';
+          ctx.fillText('結餘', width / 2, height / 2 - 10);
+          ctx.font = 'bold 24px sans-serif';
+          ctx.fillText(`$${balance}`, width / 2, height / 2 + 20);
+          ctx.save();
+        }
+      }]
+    });
+    document.getElementById('balanceStatus').innerHTML = '';
+  }
+
+  function drawLineChart() {
+  if (currentChart) currentChart.destroy();
+
+  let cumulative = 0;
+  const labels = [];
+  const values = [];
+  const tooltips = [];
+
+  entries.forEach((e, i) => {
+    const datetime = new Date(e.created_at).toLocaleString('zh-TW');
+    const desc = e.description || '';
+    const type = e.entry_type;
+    const amt = Number(e.amount);
+    const delta = (type === '收入') ? amt : -amt;
+    cumulative += delta;
+
+    labels.push(`${datetime}\n${desc}`);
+    values.push(cumulative);
+    tooltips.push(`${type}：${desc} (${type === '收入' ? '+' : '-'}NT$${amt})\\n累積結餘：NT$${cumulative}`);
+  });
+
+  currentChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '結餘變化',
+        data: values,
+        fill: false,
+        borderColor: '#16a34a',
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return tooltips[context.dataIndex];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { display: false },
+        y: { beginAtZero: false }
+      }
+    }
+  });
+
+  const status = document.getElementById('balanceStatus');
+  if (balance >= 0) {
+    status.innerHTML = `💰 本月目前水上：<b>${balance}</b> 元<br>保持下去～不要上頭！`;
+    status.className = "text-success text-center";
+  } else {
+    status.innerHTML = `💰 本月目前水下：<b>${Math.abs(balance)}</b> 元<br>沒問題～希望可以見證你上岸！`;
+    status.className = "text-danger text-center";
+  }
+}
+
+
+  function toggleChart(type) {
+    document.getElementById('btnPie').classList.toggle('btn-success', type === 'pie');
+    document.getElementById('btnPie').classList.toggle('btn-outline-secondary', type !== 'pie');
+    document.getElementById('btnLine').classList.toggle('btn-success', type === 'line');
+    document.getElementById('btnLine').classList.toggle('btn-outline-secondary', type !== 'line');
+    if (type === 'pie') drawPieChart();
+    else drawLineChart();
+  }
+
+  window.onload = () => toggleChart('pie');
+</script>
+
+</body>
+</html>
