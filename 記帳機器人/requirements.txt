@@ -1,6 +1,5 @@
-flask
-gunicorn
-line-bot-sdk>=3.0.0
-matplotlib
-psycopg2
-openai
+Flask==3.1.1
+line_bot_sdk==3.17.1
+openai==1.97.0
+psycopg2==2.9.10
+python-dotenv==1.1.1
