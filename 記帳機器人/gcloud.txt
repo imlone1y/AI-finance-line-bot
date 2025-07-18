@@ -1,2 +1,0 @@
-gcloud app logs tail -s default
-api_key="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"
