@@ -6,7 +6,7 @@ This project is a private commission. Unauthorized copying or usage is strictly 
 
 ## Project Overview
 
-To simplify accounting, this project utilizes Linebot + OpenAI for natural language processing. The model automatically identifies whether the input is an income or an expense and records it into a PostgreSQL database.
+To simplify accounting, this project utilizes `Linebot` + `OpenAI` for natural language processing. The model automatically identifies whether the input is an income or an expense and records it into a `PostgreSQL` database.
 
 ## Project Structure
 
