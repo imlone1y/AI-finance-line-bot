@@ -17,17 +17,14 @@
 ├── connect.py                      # db 連線參數
 ├── db.py                           # 處理修改 db 數值
 ├── deault_book.py                  # 設定新成員預設帳本
-├── how_to_use_template_message.py
-├── init_assistant.py
-├── main.py
-├── NLP.py
+├── how_to_use_template_message.py  # 機器人教學 flex message
+├── init_assistant.py               # 初始化 Assistant
+├── main.py                         # 主程式
+├── NLP.py                          # 自然語言處理 Assistant 參數設定
 ├── requirements.txt
-├── temp.txt
-├── template_message.py
-├── templates
-│   ├── manage_books.html
-│   └── summary.html
-└── tree.txt
+├── template_message.py             # 其餘樣板訊息設定
+└── templates
+    ├── manage_books.html           # 帳本管理網站模板
+    └── summary.html                # 餘額總覽網站模板
 ```
 ## 功能列表
-
