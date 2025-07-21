@@ -35,6 +35,6 @@
 - 設定常用網站
 
 ## 記帳機器人圖示
-下方圖片為自然語言記帳過程
+下方圖片為自然語言記帳過程：
 
 <img width="545" height="502" alt="截圖 2025-07-21 晚上10 31 10" src="https://github.com/user-attachments/assets/e53fd37d-0c57-4ba4-9987-0b1ad0078c88" />
