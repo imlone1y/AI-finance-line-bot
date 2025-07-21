@@ -1,0 +1,33 @@
+# AI 記帳機器人
+
+繁體中文 | [English](README.md)
+
+本項目為私人委託項目，未經允許不得擅自抄襲、利用。
+
+## 項目介紹
+
+為使記帳簡單化，使用 linebot + openai 做自然語言處理記帳，模型會自動分辨輸入內容為收入或是支出，並且記錄進 postgresql。
+
+## 項目結構
+```
+.
+├── app.yaml                        # 設定 gcp App Engine 參數
+├── assistant_id.json               # 紀錄 OpenAI Assistant id 用
+├── assistant_test.py               # 測試自然語言處理收入 / 支出
+├── connect.py                      # db 連線參數
+├── db.py                           # 處理修改 db 數值
+├── deault_book.py                  # 設定新成員預設帳本
+├── how_to_use_template_message.py
+├── init_assistant.py
+├── main.py
+├── NLP.py
+├── requirements.txt
+├── temp.txt
+├── template_message.py
+├── templates
+│   ├── manage_books.html
+│   └── summary.html
+└── tree.txt
+```
+## 功能列表
+
