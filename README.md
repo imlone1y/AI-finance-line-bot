@@ -12,6 +12,7 @@ To simplify accounting, this project utilizes `Linebot` + `OpenAI` for natural l
 
 ```
 .
+├── .env
 ├── app.yaml                        # GCP App Engine configuration
 ├── assistant_id.json               # Stores OpenAI Assistant ID
 ├── assistant_test.py               # Tests NLP for income/expense classification
