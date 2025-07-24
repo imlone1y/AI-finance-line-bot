@@ -11,6 +11,7 @@
 ## 項目結構
 ```
 .
+├── .env
 ├── app.yaml                        # 設定 gcp App Engine 參數
 ├── assistant_id.json               # 紀錄 OpenAI Assistant id 用
 ├── assistant_test.py               # 測試自然語言處理收入 / 支出
